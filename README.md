@@ -1,5 +1,5 @@
-PostgreSQL plugin for Dokku
----------------------------
+PostGIS plugin for Dokku
+------------------------
 
 Project: https://github.com/progrium/dokku
 
@@ -14,7 +14,7 @@ Installation
 ------------
 ```
 cd /var/lib/dokku/plugins
-git clone https://github.com/Kloadut/dokku-pg-plugin postgresql
+git clone https://github.com/fermuch/dokku-pg-plugin.git postgis
 dokku plugins-install
 ```
 
@@ -23,12 +23,12 @@ Commands
 --------
 ```
 $ dokku help
-     postgresql:create <app>     Create a PostgreSQL container
-     postgresql:delete <app>     Delete specified PostgreSQL container
-     postgresql:info <app>       Display database informations
-     postgresql:link <app> <db>  Link an app to a PostgreSQL database
-     postgresql:list             Display list of PostgreSQL containers
-     postgresql:logs <app>       Display last logs from PostgreSQL contain
+     postgis:create <app>     Create a PostGIS container
+     postgis:delete <app>     Delete specified PostGIS container
+     postgis:info <app>       Display database informations
+     postgis:link <app> <db>  Link an app to a PostGIS database
+     postgis:list             Display list of PostGIS containers
+     postgis:logs <app>       Display last logs from PostGIS contain
 ```
 
 Simple usage
@@ -36,10 +36,10 @@ Simple usage
 
 Create a new DB:
 ```
-$ dokku postgresql:create foo            # Server side
-$ ssh dokku@server postgresql:create foo # Client side
+$ dokku postgis:create foo            # Server side
+$ ssh dokku@server postgis:create foo # Client side
 
------> PostgreSQL container created: postgresql/foo
+-----> PostGIS container created: postgis/foo
 
        Host: 172.17.42.1
        User: 'root'
@@ -57,7 +57,7 @@ $ git push dokku master
 
 Link your app to the database
 ```bash
-dokku postgresql:link app_name database_name
+dokku postgis:link app_name database_name
 ```
 
 
@@ -66,30 +66,30 @@ Advanced usage
 
 Inititalize the database with SQL statements:
 ```
-cat init.sql | dokku postgresql:create foo
+cat init.sql | dokku postgis:create foo
 ```
 
 Deleting databases:
 ```
-dokku postgresql:delete foo
+dokku postgis:delete foo
 ```
 
 Linking an app to a specific database:
 ```
-dokku postgresql:link foo bar
+dokku postgis:link foo bar
 ```
 
-PostgreSQL logs (per database):
+postgis logs (per database):
 ```
-dokku postgresql:logs foo
+dokku postgis:logs foo
 ```
 
 Database informations:
 ```
-dokku postgresql:info foo
+dokku postgis:info foo
 ```
 
 List of containers:
 ```
-dokku postgresql:list
+dokku postgis:list
 ```
