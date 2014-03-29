@@ -28,7 +28,7 @@ case "$1" in
   postgis:create)
     DB_IMAGE=postgis/$APP
     # Check if DB container is installed
-    IMAGE=$(docker images | grep "kloadut/postgres " |  awk '{print $3}')
+    IMAGE=$(docker images | grep "kloadut/postgresql" |  awk '{print $3}')
     if [[ -z $IMAGE ]]; then
         echo "postgis image not found... Did you run 'dokku plugins-install' ?"
         exit 1
@@ -47,7 +47,7 @@ case "$1" in
         chmod 700 "$DOKKU_ROOT/.postgis/pwd_$APP"
     fi
     # Fork DB image
-    ID=$(docker run -d kloadut/postgres exit 0)
+    ID=$(docker run -d kloadut/postgresql exit 0)
     docker wait $ID > /dev/null
     IMAGE=$(docker commit $ID)
     docker tag $IMAGE $DB_IMAGE
