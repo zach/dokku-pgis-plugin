@@ -67,10 +67,10 @@ case "$1" in
     PORT=$(docker port $ID 5432 | sed 's/0.0.0.0://')
     echo $PORT > "$DOKKU_ROOT/.postgis/port_$APP"
 
-    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis;"
-    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis_topology;"
-    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION fuzzystrmatch;"
-    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis_tiger_geocoder;"
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE 'psql -d db <<< "CREATE EXTENSION postgis;"'
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE 'psql -d db <<< "CREATE EXTENSION postgis_topology;"'
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE 'psql -d db <<< "CREATE EXTENSION fuzzystrmatch;"'
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE 'psql -d db <<< "CREATE EXTENSION postgis_tiger_geocoder;"'
 
     # Link to a potential existing app
     dokku postgis:link $APP $APP
