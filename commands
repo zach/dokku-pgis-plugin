@@ -66,6 +66,12 @@ case "$1" in
     # Write port for further usage
     PORT=$(docker port $ID 5432 | sed 's/0.0.0.0://')
     echo $PORT > "$DOKKU_ROOT/.postgis/port_$APP"
+
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis;"
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis_topology;"
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION fuzzystrmatch;"
+    docker run -v $VOLUME -p 5432 -d $DB_IMAGE psql -d db "CREATE EXTENSION postgis_tiger_geocoder;"
+
     # Link to a potential existing app
     dokku postgis:link $APP $APP
     echo
@@ -121,7 +127,7 @@ case "$1" in
     echo "       Password: '$DB_PASSWORD'"
     echo "       Database: 'db'"
     echo
-    echo "       Url: 'postgres://root:$DB_PASSWORD@172.17.42.1:$PORT/db'"
+    echo "       Url: 'postgis://root:$DB_PASSWORD@172.17.42.1:$PORT/db'"
     echo
     ;;
 
@@ -140,7 +146,7 @@ case "$1" in
         DB_PASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
         PORT=$(cat "$DOKKU_ROOT/.postgis/port_$APP")
         # Link database using dokku command
-        dokku config:set $APP "DATABASE_URL=postgres://root:$DB_PASSWORD@172.17.42.1:$PORT/db"
+        dokku config:set $APP "DATABASE_URL=postgis://root:$DB_PASSWORD@172.17.42.1:$PORT/db"
         echo
         echo "-----> $APP linked to $DB_IMAGE database"
     fi
