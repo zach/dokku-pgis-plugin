@@ -23,10 +23,51 @@ if [[ ! -d $DOKKU_ROOT/.postgis ]]; then
     chown -R dokku: $DOKKU_ROOT/.postgis
 fi
 
+function check_postgresql_container() {
+    if [[ ! -f "$DOKKU_ROOT/.postgis/pwd_$APP" ]]; then
+        echo "Unknown (or too old) PostgreSQL container"
+        exit 1
+    fi
+}
+
+function check_postgresql_tool() {
+    local tool_name="$1"
+    if [[ $(whereis $tool_name | awk '{ print NF }') -eq 1 ]]; then
+        echo "'${tool_name}' not found. Is the package 'postgresql-client' installed?" 1>&2
+        exit 1
+    fi
+}
+
+function get_postgresql_id() {
+    ID=$(docker ps | grep postgis/"$APP":latest | awk {'print $1'})
+    echo $ID
+}
+
+function get_postgresql_port() {
+    ID=$(get_postgresql_id)
+    PORT=$(docker port "$ID" 5432 | sed 's/0.0.0.0://')
+    echo $PORT
+}
+
+
+function connect_to_db() {
+    export PGPASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
+    PORT=$(get_postgresql_port)
+
+    psql -h 172.17.42.1 -p $PORT -U root db
+}
+
 case "$1" in
+
+  postgis:console)
+    check_postgresql_container
+    check_postgresql_tool psql
+    connect_to_db
+    ;;
 
   postgis:create)
     DB_IMAGE=postgis/$APP
+
     # Check if DB container is installed
     IMAGE=$(docker images | grep "kloadut/postgresql" |  awk '{print $3}')
     if [[ -z $IMAGE ]]; then
@@ -47,7 +88,7 @@ case "$1" in
         chmod 700 "$DOKKU_ROOT/.postgis/pwd_$APP"
     fi
     # Fork DB image
-    ID=$(docker run -d kloadut/postgresql echo)
+    ID=$(docker run -d kloadut/postgresql echo '')
     docker wait $ID > /dev/null
     IMAGE=$(docker commit $ID)
     docker tag $IMAGE $DB_IMAGE
@@ -63,10 +104,6 @@ case "$1" in
         fi
         echo $VOLUME_PATH > "$DOKKU_ROOT/.postgis/volume_$APP"
     fi
-    # Write port for further usage
-    PORT=$(docker port $ID 5432 | sed 's/0.0.0.0://')
-    echo $PORT > "$DOKKU_ROOT/.postgis/port_$APP"
-
     # Link to a potential existing app
     dokku postgis:link $APP $APP
     echo
@@ -77,7 +114,7 @@ case "$1" in
 
   postgis:delete)
     DB_IMAGE=postgis/$APP
-    ID=$(docker ps -a | grep "$DB_IMAGE":latest |  awk '{print $1}')
+    ID=$(get_postgresql_id)
     # Stop and remove the container
     if [[ ! -z $ID ]]; then
         docker kill $ID > /dev/null
@@ -90,10 +127,6 @@ case "$1" in
     if [[ ! -z $IMAGE ]]; then
         docker rmi $IMAGE > /dev/null
     fi
-    # Remove container port storage
-    if [[ -f "$DOKKU_ROOT/.postgis/port_$APP" ]]; then
-        rm -f "$DOKKU_ROOT/.postgis/port_$APP"
-    fi
     # Remove container root password
     if [[ -f "$DOKKU_ROOT/.postgis/pwd_$APP" ]]; then
         rm -f "$DOKKU_ROOT/.postgis/pwd_$APP"
@@ -102,18 +135,28 @@ case "$1" in
     if [[ -f "$DOKKU_ROOT/.postgis/volume_$APP" ]]; then
         rm -f "$DOKKU_ROOT/.postgis/volume_$APP"
     fi
+
     echo
     echo "-----> postgis container deleted: $DB_IMAGE"
     ;;
 
+  postgis:dump)
+    check_postgresql_container
+    check_postgresql_tool pg_dump
+    export PGPASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
+    PORT=$(get_postgresql_port)
+
+    pg_dump -h 172.17.42.1 -p $PORT -U root -c -O db
+
+    # echo to stderr, as stdout will probably be redirected to a file
+    echo 1>&2
+    echo "-----> $APP database dumped" 1>&2
+    ;;
+
   postgis:info)
-    DB_IMAGE=postgis/$APP
-    if [[ ! -f "$DOKKU_ROOT/.postgis/pwd_$APP" ]]; then
-        echo "Unknown (or too old) postgis container"
-        exit 1
-    fi
+    check_postgresql_container
     DB_PASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
-    PORT=$(cat "$DOKKU_ROOT/.postgis/port_$APP")
+    PORT=$(get_postgresql_port)
 
     echo
     echo "       Host: 172.17.42.1"
@@ -134,12 +177,12 @@ case "$1" in
             exit 1
         fi
         DB_IMAGE="postgis/$3"
-    	if [[ ! -f "$DOKKU_ROOT/.postgis/pwd_$APP" ]]; then
-            echo "Database is not initialized correctly"
-            exit 0
+        if [[ ! -f "$DOKKU_ROOT/.postgis/pwd_$3" ]]; then
+          echo "Database is not initialized correctly. Did you run 'dokku plugins-install'?"
+          exit 1
         fi
-        DB_PASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
-        PORT=$(cat "$DOKKU_ROOT/.postgis/port_$APP")
+        DB_PASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$3")
+        PORT=$(get_postgresql_port)
         # Link database using dokku command
         dokku config:set $APP "DATABASE_URL=postgis://root:$DB_PASSWORD@172.17.42.1:$PORT/db"
         docker run $DB_IMAGE /usr/bin/add_postgis.sh $DB_PASSWORD $PORT
@@ -150,27 +193,42 @@ case "$1" in
     ;;
 
   postgis:logs)
-    DB_IMAGE=postgis/$APP
-    ID=$(docker ps -a | grep "$DB_IMAGE" |  awk '{print $1}')
+    ID=$(get_postgresql_id)
     docker logs $ID | tail -n 100
     ;;
 
   postgis:list)
-    CONTAINERS=$(ls $DOKKU_ROOT/.postgis/volume* | sed -e 's/_/ /' | awk '{print $2}')
-    echo "postgis containers:"
-    for CONTAINER in $CONTAINERS; do
+    CONTAINERS=$(ls $DOKKU_ROOT/.postgis/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
+    if [[ -z $CONTAINERS ]]; then
+      echo "There are no PostGIS containers created."
+    else
+      echo "PostGIS containers:"
+      for CONTAINER in $CONTAINERS; do
         echo "  - $CONTAINER"
-    done
+      done
+    fi
+    ;;
+
+    postgis:restore)
+    check_postgresql_container
+    check_postgresql_tool psql
+    connect_to_db
+
+    echo
+    echo "-----> $APP database restored"
     ;;
 
   help)
     cat && cat<<EOF
-    postgis:create <app>     Create a postgis container
-    postgis:delete <app>     Delete specified postgis container
-    postgis:info <app>       Display database informations
-    postgis:link <app> <db>  Link an app to a postgis database
-    postgis:list             Display list of postgis containers
-    postgis:logs <app>       Display last logs from postgis container
+    postgis:console <db>                        Open a PostgreSQL console
+    postgis:create <db>                         Create a PostgreSQL container
+    postgis:delete <db>                         Delete specified PostgreSQL container
+    postgis:dump <db> > dump_file.sql           Dump database data
+    postgis:info <db>                           Display database informations
+    postgis:link <app> <db>                     Link an app to a PostgreSQL database
+    postgis:list                                Display list of PostgreSQL containers
+    postgis:logs <db>                           Display last logs from PostgreSQL container
+    postgis:restore <db> < dump_file.sql        Restore database data from a previous dump
 EOF
     ;;
 

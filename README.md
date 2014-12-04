@@ -23,12 +23,15 @@ Commands
 --------
 ```
 $ dokku help
-     postgis:create <app>     Create a PostGIS container
-     postgis:delete <app>     Delete specified PostGIS container
-     postgis:info <app>       Display database informations
-     postgis:link <app> <db>  Link an app to a PostGIS database
-     postgis:list             Display list of PostGIS containers
-     postgis:logs <app>       Display last logs from PostGIS contain
+    postgis:console <db>                        Open a PostGIS console
+    postgis:create <db>                         Create a PostGIS container
+    postgis:delete <db>                         Delete specified PostGIS container
+    postgis:dump <db> > dump_file.sql           Dump database data
+    postgis:info <db>                           Display database informations
+    postgis:link <app> <db>                     Link an app to a PostGIS database
+    postgis:list                                Display list of PostGIS containers
+    postgis:logs <db>                           Display last logs from PostGIS container
+    postgis:restore <db> < dump_file.sql        Restore database data from a previous dump
 ```
 
 Simple usage
@@ -69,6 +72,11 @@ Inititalize the database with SQL statements:
 cat init.sql | dokku postgis:create foo
 ```
 
+Open a PostGIS console for specified database:
+```
+dokku postgis:console foo
+```
+
 Deleting databases:
 ```
 dokku postgis:delete foo
@@ -84,7 +92,7 @@ postgis logs (per database):
 dokku postgis:logs foo
 ```
 
-Database informations:
+Database information:
 ```
 dokku postgis:info foo
 ```
@@ -92,4 +100,19 @@ dokku postgis:info foo
 List of containers:
 ```
 dokku postgis:list
+```
+
+Dump a database:
+```
+dokku postgis:dump foo > foo.sql
+```
+
+Restore a database:
+```
+dokku postgis:restore foo < foo.sql
+```
+
+In case Dokku says `pg_dump not found` when dumping or restoring database:
+```
+sudo apt-get install postgresql-client-9.3
 ```
